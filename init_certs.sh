@@ -31,7 +31,7 @@ openssl req -config $ROOT_CA_PATH/ca.cnf \
       -key $ROOT_CA_PATH/private/ca.key -passin file:$KEYPASS_FILE \
       -new -x509 -days 7300 -sha256 -extensions v3_ca \
       -out $ROOT_CA_PATH/certs/ca.crt \
-      -subj "/C=US/ST=California/L=San Francisco/O=Internal Certification Authority/OU=Root Certification Authority/CN=Root Certification Authority"
+      -subj "/C=US/ST=California/L=San Francisco/O=Internal Certification Authority/OU=Root Certification Authority/CN=Root Certification Authority/CN=localhost"
 
 
 # creates intermediate CA
@@ -39,7 +39,7 @@ openssl genrsa -aes256 -passout pass:123456 -out $INTERMEDIATE_CA_PATH/private/c
 openssl req -config $INTERMEDIATE_CA_PATH/ca.cnf -new -sha256 \
       -key $INTERMEDIATE_CA_PATH/private/ca.key -passin file:$KEYPASS_FILE \
       -out $INTERMEDIATE_CA_PATH/csr/ca.csr\
-      -subj "/C=US/ST=California/L=San Francisco/O=Internal Certification Authority/OU=Intermediate Certification Authority/CN=Intermediate Certification Authority"
+      -subj "/C=US/ST=California/L=San Francisco/O=Internal Certification Authority/OU=Intermediate Certification Authority/CN=Intermediate Certification Authority/CN=localhost"
 
 openssl ca -batch -config $ROOT_CA_PATH/ca.cnf -extensions v3_intermediate_ca \
       -days 3650 -notext -md sha256 \
@@ -54,33 +54,29 @@ openssl genrsa -out server/server.key 2048
 openssl req -config $INTERMEDIATE_CA_PATH/ca.cnf \
       -key server/server.key \
       -new -sha256 -out server/server.csr \
-      -subj "/C=US/ST=California/L=San Francisco/O=Generic Application /OU=Generic SSL Server/CN=Generic SSL Server"
+      -subj "/C=US/ST=California/L=San Francisco/O=Generic Application /OU=Generic SSL Server/CN=Generic SSL Server/CN=localhost"
 
 openssl ca -batch -config $INTERMEDIATE_CA_PATH/ca.cnf \
       -extensions server_cert -days 375 -notext -md sha256 \
       -in server/server.csr -passin file:$KEYPASS_FILE\
       -out server/server.crt
 
-cat server/server.crt ca_bundle.pem > server/fullchain.pem
-
 # creates client certificate
 openssl genrsa -out client/client.key 2048
 openssl req -config $INTERMEDIATE_CA_PATH/ca.cnf \
       -key client/client.key \
       -new -sha256 -out client/client.csr \
-      -subj "/C=US/ST=California/L=San Francisco/O=Generic Application /OU=Generic SSL Client/CN=Generic SSL Client"
+      -subj "/C=US/ST=California/L=San Francisco/O=Generic Application /OU=Generic SSL Client/CN=Generic SSL Client/CN=localhost"
 
 openssl ca -batch -config $INTERMEDIATE_CA_PATH/ca.cnf \
       -extensions usr_cert -days 375 -notext -md sha256 \
       -in client/client.csr -passin file:$KEYPASS_FILE\
       -out client/client.crt
 
-cat client/client.crt ca_bundle.pem > client/fullchain.pem
-
 # echo Importing keystore/truststore
 
-openssl pkcs12 -export -in server/fullchain.pem -inkey server/server.key -name serverkeystore -out server/server.p12 -passout file:$KEYPASS_FILE
-openssl pkcs12 -export -in client/fullchain.pem -inkey client/client.key -name clientkeystore -out client/client.p12 -passout file:$KEYPASS_FILE
+openssl pkcs12 -export -in server/server.crt -inkey server/server.key -name serverkeystore -out server/server.p12 -passout file:$KEYPASS_FILE
+openssl pkcs12 -export -in client/client.crt -inkey client/client.key -name clientkeystore -out client/client.p12 -passout file:$KEYPASS_FILE
 
 
 keytool -importkeystore -deststorepass:file $KEYPASS_FILE -destkeystore server/server.keystore -srckeystore server/server.p12 -srcstorepass:file $KEYPASS_FILE -srcstoretype PKCS12 -noprompt
